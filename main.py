@@ -110,9 +110,6 @@ class Player(pygame.sprite.Sprite):
 
 # Create Enemy class and subclasses as sprites
 class Enemy:
-    # def __init__(self):
-    #     self.x = random.randint(0, WIDTH)
-    #     self.y = random.randint(0, HEIGHT)
 
     def check_death(self):
         if self.health <= 0:
@@ -139,13 +136,26 @@ class Enemy:
 class Gunner(Enemy, pygame.sprite.Sprite):
     def __init__(self):
         super().__init__()
-        self.image = pygame.image.load('./assets/enemy-bird.gif').convert_alpha()
+        self.image = pygame.transform.scale_by(pygame.image.load('./assets/enemy-bird.gif').convert_alpha(), .5)
         self.rect = self.image.get_rect(topleft = (random.randint(0, WIDTH), random.randint(0, HEIGHT)))
         self.health = 100
         self.speed = 3
+        self.max_shoot_timer = 5
+        self.shoot_timer = self.max_shoot_timer
 
-    def shoot(self):
-        projectiles.add(Projectile)
+    def check_shoot(self):
+        if self.shoot_timer <= 0:
+            self.shoot_timer = self.max_shoot_timer
+            x_distance, y_distance = player.sprite.rect.x - self.rect.x, player.sprite.rect.y - self.rect.y
+            total_distance = dist((player.sprite.rect.x, player.sprite.rect.y), (self.rect.x, self.rect.y))
+            x_change = x_distance / total_distance
+            y_change = y_distance / total_distance
+            projectiles.add(Projectile('energy', self.rect.x, self.rect.y, x_change, y_change))
+
+    def update(self):
+        super().update()
+        self.check_shoot()
+
 
 
 class Bomber(Enemy, pygame.sprite.Sprite):
@@ -162,22 +172,24 @@ class Bomber(Enemy, pygame.sprite.Sprite):
 
 # Create Projectile class as a sprite
 class Projectile(pygame.sprite.Sprite):
-    def __init__(self, type, x, y, x_vel, y_vel):
+    def __init__(self, type, x, y, x_change, y_change):
         super().__init__()
-        self.x_vel = x_vel
-        self.y_vel = y_vel
+        self.x_change = x_change
+        self.y_change = y_change
 
         if type == 'energy':
-            image = pygame.image.load('./assets/bullet-energy.png').convert_alpha()
+            image = pygame.transform.scale_by(pygame.image.load('./assets/bullet-energy.png').convert_alpha(), .2)
+            self.speed = 4
         elif type == 'musket':
-            image = pygame.image.load('./assets/bullet-musket.png').convert_alpha()
+            image = pygame.transform.scale_by(pygame.image.load('./assets/bullet-musket.png').convert_alpha(), .2)
+            self.speed = 8
 
         self.image = image
         self.rect = self.image.get_rect(topleft = (x, y))
 
     def move(self):
-        self.rect.x += self.x_vel
-        self.rect.y += self.y_vel
+        self.rect.x += self.x_change * self.speed
+        self.rect.y += self.y_change * self.speed
 
     def update(self):
         self.move()
@@ -286,9 +298,11 @@ while running:
 
     pygame.display.update()
     player.sprite.invulnerable_time -= 1 / FPS
-    player.sprite.current_shadow_cooldown -= 1/FPS
+    player.sprite.current_shadow_cooldown -= 1 / FPS
     if player.sprite.current_shadow_cooldown < 0:
         player.sprite.current_shadow_cooldown = 0
+    for sprite in enemies:
+        sprite.shoot_timer -= 1 / FPS
     clock.tick(FPS)
 
 
