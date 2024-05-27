@@ -55,11 +55,22 @@ class Player(pygame.sprite.Sprite):
     def animation_state(self):
         pass
 
+
     def check_death(self):
         if self.health <= 0:
             # add death animation
             global running
             running = False
+
+    def check_bounds(self):
+        if self.rect.x < 0:
+            self.rect.x = 0
+        if self.rect.x > WIDTH - self.rect.width:
+            self.rect.x = WIDTH - self.rect.width
+        if self.rect.y < 0:
+            self.rect.y = 0
+        if self.rect.y > HEIGHT - self.rect.height:
+            self.rect.y = HEIGHT - self.rect.height
 
     def space_pressed(self):
         if self.current_shadow_cooldown <= 0:
@@ -79,7 +90,6 @@ class Player(pygame.sprite.Sprite):
         player_life_surface = pygame.transform.scale_by(pygame.image.load('./assets/shadow_heart.png').convert_alpha(), .046)
         self.speed *= .7
 
-
     def exit_shade(self):
         self.in_shadow = False
         global background_color
@@ -95,6 +105,7 @@ class Player(pygame.sprite.Sprite):
         self.player_inputs()
         self.animation_state()
         self.check_death()
+        self.check_bounds()
 
 
 # Create Enemy class as a sprite
@@ -129,8 +140,22 @@ class Gunner(pygame.sprite.Sprite):
         self.destroy()
 
 
+# Create Projectile class as a sprite
+class Projectile(pygame.sprite.Sprite):
+    def __init__(self, type):
+        super().__init__()
+
+        if type == 'energy':
+            image = pygame.image.load('./assets/bullet-energy.png').convert_alpha()
+        elif type == 'musket':
+            image = pygame.image.load('./assets/bullet-musket.png').convert_alpha()
+
+        self.image = image
+        self.rect = self.image.get_rect()
+
+
 # Create collison functions
-def detect_collison(object_group, destroy_object):
+def detect_collision(object_group, destroy_object):
     collision_list = pygame.sprite.spritecollide(player.sprite, object_group, destroy_object)
     if collision_list:
         player.sprite.collision()
@@ -158,9 +183,16 @@ player.add(Player())
 
 # Create the enemy sprite group
 enemies = pygame.sprite.Group()
-enemies.add(Gunner())
 
 # Create the projectile sprite group
+projectiles = pygame.sprite.Group()
+
+# Create enemy spawn event timers
+gunner_spawn = pygame.USEREVENT + 1
+pygame.time.set_timer(gunner_spawn, 1000)
+
+projectile_spawn = pygame.USEREVENT + 2
+pygame.time.set_timer(projectile_spawn, 500)
 
 # Create UI element surfaces
 player_life_surface = pygame.transform.scale_by(pygame.image.load('./assets/player_heart.png').convert_alpha(), .04)
@@ -181,6 +213,12 @@ while running:
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_SPACE:
                 player.sprite.space_pressed()
+        
+        if event.type == gunner_spawn:
+            enemies.add(Gunner())
+
+        if event.type == projectile_spawn:
+            projectiles.add(Projectile('energy'))
 
     screen.fill(background_color)
 
@@ -196,14 +234,17 @@ while running:
 
     pygame.draw.rect(screen, 'black', (500, 5, (player.sprite.max_shadow_cooldown-player.sprite.current_shadow_cooldown)*200, 30))
 
-    detect_collison(enemies, False)
-    # detect_collision(projectiles, True)
+    detect_collision(enemies, False)
+    detect_collision(projectiles, True)
 
     player.update()
     player.draw(screen)
 
     enemies.update()
     enemies.draw(screen)
+
+    projectiles.update()
+    projectiles.draw(screen)
 
     pygame.display.update()
     player.sprite.invulnerable_time -= 1 / FPS
