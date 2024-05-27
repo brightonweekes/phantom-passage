@@ -108,16 +108,13 @@ class Player(pygame.sprite.Sprite):
         self.check_bounds()
 
 
-# Create Enemy class as a sprite
-class Gunner(pygame.sprite.Sprite):
-    def __init__(self):
-        super().__init__()
-        self.image = pygame.image.load('./assets/enemy-bird.gif').convert_alpha()
-        self.rect = self.image.get_rect(topleft = (random.randint(0, 1000), random.randint(0, 1000)))
-        self.health = 100
-        self.speed = 3
+# Create Enemy class and subclasses as sprites
+class Enemy:
+    # def __init__(self):
+    #     self.x = random.randint(0, WIDTH)
+    #     self.y = random.randint(0, HEIGHT)
 
-    def destroy(self):
+    def check_death(self):
         if self.health <= 0:
             self.kill()
 
@@ -134,16 +131,41 @@ class Gunner(pygame.sprite.Sprite):
             self.rect.x += x_change * self.speed
             self.rect.y += y_change * self.speed
 
-
     def update(self):
         self.move()
-        self.destroy()
+        self.check_death()
+
+
+class Gunner(Enemy, pygame.sprite.Sprite):
+    def __init__(self):
+        super().__init__()
+        self.image = pygame.image.load('./assets/enemy-bird.gif').convert_alpha()
+        self.rect = self.image.get_rect(topleft = (random.randint(0, WIDTH), random.randint(0, HEIGHT)))
+        self.health = 100
+        self.speed = 3
+
+    def shoot(self):
+        projectiles.add(Projectile)
+
+
+class Bomber(Enemy, pygame.sprite.Sprite):
+    def __init__(self):
+        super().__init__()
+        self.image = pygame.image.load('./assets/enemy-bomb.gif').convert_alpha()
+        self.rect = self.image.get_rect()
+        self.health = 200
+        self.speed = 3
+
+    def explode(self):
+        pass
 
 
 # Create Projectile class as a sprite
 class Projectile(pygame.sprite.Sprite):
-    def __init__(self, type):
+    def __init__(self, type, x, y, x_vel, y_vel):
         super().__init__()
+        self.x_vel = x_vel
+        self.y_vel = y_vel
 
         if type == 'energy':
             image = pygame.image.load('./assets/bullet-energy.png').convert_alpha()
@@ -151,7 +173,29 @@ class Projectile(pygame.sprite.Sprite):
             image = pygame.image.load('./assets/bullet-musket.png').convert_alpha()
 
         self.image = image
-        self.rect = self.image.get_rect()
+        self.rect = self.image.get_rect(topleft = (x, y))
+
+    def move(self):
+        self.rect.x += self.x_vel
+        self.rect.y += self.y_vel
+
+    def update(self):
+        self.move()
+
+
+# Create Timer class
+class Timer:
+    def __init__(self, interval, action):
+        self.interval = interval
+        self.action = action
+        self.start_time = pygame.time.get_ticks()
+
+    def update(self):
+        current_time = pygame.time.get_ticks()
+        elapsed_time = current_time - self.start_time
+        if elapsed_time >= self.interval:
+            self.action()
+            self.start_time = current_time  # Reset timer
 
 
 # Create collison functions
@@ -191,9 +235,6 @@ projectiles = pygame.sprite.Group()
 gunner_spawn = pygame.USEREVENT + 1
 pygame.time.set_timer(gunner_spawn, 1000)
 
-projectile_spawn = pygame.USEREVENT + 2
-pygame.time.set_timer(projectile_spawn, 500)
-
 # Create UI element surfaces
 player_life_surface = pygame.transform.scale_by(pygame.image.load('./assets/player_heart.png').convert_alpha(), .04)
 
@@ -216,9 +257,6 @@ while running:
         
         if event.type == gunner_spawn:
             enemies.add(Gunner())
-
-        if event.type == projectile_spawn:
-            projectiles.add(Projectile('energy'))
 
     screen.fill(background_color)
 
