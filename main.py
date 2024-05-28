@@ -15,8 +15,8 @@ class Player(pygame.sprite.Sprite):
 
         self.image = self.player_images[self.animation_index]
         self.rect = self.image.get_rect(topleft = (300, 300))
-        self.max_health = 3
-        self.health = 3
+        self.max_health = 10
+        self.health = self.max_health
         self.score = 0
         self.speed = 6
         self.damage = 1
@@ -31,13 +31,13 @@ class Player(pygame.sprite.Sprite):
         x_change = 0
         y_change = 0
 
-        if keys[pygame.K_w]:
+        if keys[pygame.K_w] or keys[pygame.K_UP]:
             y_change -= 1
-        if keys[pygame.K_s]:
+        if keys[pygame.K_s] or keys[pygame.K_DOWN]:
             y_change += 1
-        if keys[pygame.K_a]:
+        if keys[pygame.K_a] or keys[pygame.K_LEFT]:
             x_change -= 1
-        if keys[pygame.K_d]:
+        if keys[pygame.K_d] or keys[pygame.K_RIGHT]:
             x_change += 1
 
         if x_change != 0 and y_change != 0:
@@ -51,10 +51,10 @@ class Player(pygame.sprite.Sprite):
         if self.invulnerable_time <= 0:
             self.health -= 1
             self.invulnerable_time = self.max_invulnerable_time
+            pygame.mixer.Sound('./assets/hit.wav').play()
 
     def animation_state(self):
         pass
-
 
     def check_death(self):
         if self.health <= 0:
@@ -84,11 +84,13 @@ class Player(pygame.sprite.Sprite):
 
     def enter_shade(self):
         self.in_shadow = True
+        pygame.mixer.Sound('./assets/warp.wav').play()
         global background_color
         background_color = '#E3E3EA'
         global player_life_surface
         player_life_surface = pygame.transform.scale_by(pygame.image.load('./assets/shadow_heart.png').convert_alpha(), .046)
         self.speed *= .7
+        pygame.mixer.Sound('./assets/warp.wav').play()
 
     def exit_shade(self):
         self.in_shadow = False
@@ -97,9 +99,13 @@ class Player(pygame.sprite.Sprite):
         global player_life_surface
         player_life_surface = pygame.transform.scale_by(pygame.image.load('./assets/player_heart.png').convert_alpha(), .04)
         self.speed /= .7
+        pygame.mixer.Sound('./assets/warp.wav').play()
 
     def failed_shade_jump(self):
-        self.health -= 1        
+        self.health -= 1   
+
+    def energy_gun(self):
+        pass
 
     def update(self):
         self.player_inputs()
@@ -148,14 +154,18 @@ class Gunner(Enemy, pygame.sprite.Sprite):
             self.shoot_timer = self.max_shoot_timer
             x_distance, y_distance = player.sprite.rect.x - self.rect.x, player.sprite.rect.y - self.rect.y
             total_distance = dist((player.sprite.rect.x, player.sprite.rect.y), (self.rect.x, self.rect.y))
-            x_change = x_distance / total_distance
-            y_change = y_distance / total_distance
+            if total_distance != 0:
+                x_change = x_distance / total_distance
+                y_change = y_distance / total_distance
+            else:
+                x_change = 0
+                y_change = 0
             projectiles.add(Projectile('energy', self.rect.x, self.rect.y, x_change, y_change))
+            pygame.mixer.Sound('./assets/pew.wav').play()
 
     def update(self):
         super().update()
         self.check_shoot()
-
 
 
 class Bomber(Enemy, pygame.sprite.Sprite):
@@ -224,13 +234,13 @@ SCREEN_RES = WIDTH, HEIGHT = 1920, 1040
 FPS = 60
 running = True
 screen = pygame.display.set_mode(SCREEN_RES)
-pygame.display.set_caption('Raider of Dusk')
+pygame.display.set_caption('Phantom Passage')
 clock = pygame.time.Clock()
 main_font = pygame.font.Font('./assets/Pixeltype.ttf', 50)
 round = 1
 background_color = '#2B2B2F'
-background_music = pygame.mixer.Sound('./assets/slow_descent.mp3')
-background_music.set_volume(0)
+background_music = pygame.mixer.Sound('./assets/main_audio.mp3')
+background_music.set_volume(1)
 background_music.play(loops=-1)
 
 # Create the player sprite group
@@ -242,6 +252,9 @@ enemies = pygame.sprite.Group()
 
 # Create the projectile sprite group
 projectiles = pygame.sprite.Group()
+
+# Create the player projectiles sprite group
+player_projectiles = pygame.sprite.Group()
 
 # Create enemy spawn event timers
 gunner_spawn = pygame.USEREVENT + 1
