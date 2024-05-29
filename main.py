@@ -47,7 +47,7 @@ class Player(pygame.sprite.Sprite):
         self.rect.x += x_change * self.speed
         self.rect.y += y_change * self.speed
 
-    def collision(self):
+    def take_damage(self):
         if self.invulnerable_time <= 0:
             self.health -= 1
             self.invulnerable_time = self.max_invulnerable_time
@@ -105,7 +105,21 @@ class Player(pygame.sprite.Sprite):
         self.health -= 1   
 
     def energy_gun(self):
-        pass
+        if enemies:
+            closest_enemy = 0, dist((self.rect.x, self.rect.y), (enemies.sprites()[0].rect.x, enemies.sprites()[0].rect.y))
+            for enemy in enumerate(enemies.sprites()):
+                enemy_dist = dist((self.rect.x, self.rect.y), (enemy[1].rect.x, enemy[1].rect.y))
+                if enemy_dist < closest_enemy[1]:
+                    closest_enemy = enemy[0], enemy_dist
+            x_change, y_change = find_vel(self.rect, enemies.sprites()[closest_enemy[0]].rect)
+            player_projectiles.add(Projectile('musket', self.rect.x, self.rect.y, x_change, y_change))
+            pygame.mixer.Sound('./assets/musket-fire.wav').play()
+
+    def get_kill(self, enemy_type):
+        if enemy_type == 'Gunner':
+            self.score += 5
+        else:
+            self.score += 10
 
     def update(self):
         self.player_inputs()
@@ -116,11 +130,6 @@ class Player(pygame.sprite.Sprite):
 
 # Create Enemy class and subclasses as sprites
 class Enemy:
-
-    def check_death(self):
-        if self.health <= 0:
-            self.kill()
-
     def move(self):
         x_distance, y_distance = player.sprite.rect.x - self.rect.x, player.sprite.rect.y - self.rect.y
         total_distance = dist((player.sprite.rect.x, player.sprite.rect.y), (self.rect.x, self.rect.y))
@@ -134,9 +143,14 @@ class Enemy:
             self.rect.x += x_change * self.speed
             self.rect.y += y_change * self.speed
 
+    def take_damage(self):
+        self.health -= 50
+        if self.health <= 0:
+            player.sprite.get_kill('Gunner')
+            self.kill()
+
     def update(self):
         self.move()
-        self.check_death()
 
 
 class Gunner(Enemy, pygame.sprite.Sprite):
@@ -152,14 +166,7 @@ class Gunner(Enemy, pygame.sprite.Sprite):
     def check_shoot(self):
         if self.shoot_timer <= 0:
             self.shoot_timer = self.max_shoot_timer
-            x_distance, y_distance = player.sprite.rect.x - self.rect.x, player.sprite.rect.y - self.rect.y
-            total_distance = dist((player.sprite.rect.x, player.sprite.rect.y), (self.rect.x, self.rect.y))
-            if total_distance != 0:
-                x_change = x_distance / total_distance
-                y_change = y_distance / total_distance
-            else:
-                x_change = 0
-                y_change = 0
+            x_change, y_change = find_vel(self.rect, player.sprite.rect)
             projectiles.add(Projectile('energy', self.rect.x, self.rect.y, x_change, y_change))
             pygame.mixer.Sound('./assets/pew.wav').play()
 
@@ -191,8 +198,8 @@ class Projectile(pygame.sprite.Sprite):
             image = pygame.transform.scale_by(pygame.image.load('./assets/bullet-energy.png').convert_alpha(), .2)
             self.speed = 4
         elif type == 'musket':
-            image = pygame.transform.scale_by(pygame.image.load('./assets/bullet-musket.png').convert_alpha(), .2)
-            self.speed = 8
+            image = pygame.transform.scale_by(pygame.image.load('./assets/bullet-snowball.png').convert_alpha(), .2)
+            self.speed = 20
 
         self.image = image
         self.rect = self.image.get_rect(topleft = (x, y))
@@ -221,11 +228,23 @@ class Timer:
 
 
 # Create collison functions
-def detect_collision(object_group, destroy_object):
-    collision_list = pygame.sprite.spritecollide(player.sprite, object_group, destroy_object)
+def detect_collision(target_group, object_group, do_destroy_object):
+    collision_list = pygame.sprite.spritecollide(target_group, object_group, do_destroy_object)
     if collision_list:
-        player.sprite.collision()
+        target_group.take_damage()
     return collision_list
+
+
+def find_vel(point1, point2):
+    x_distance, y_distance = point2.x - point1.x, point2.y - point1.y
+    total_distance = dist((point2.x, point2.y), (point1.x, point1.y))
+    if total_distance != 0:
+        x_change = x_distance / total_distance
+        y_change = y_distance / total_distance
+    else:
+        x_change = 0
+        y_change = 0
+    return x_change, y_change
 
 
 # Initialize pygame, screen, clock
@@ -260,6 +279,9 @@ player_projectiles = pygame.sprite.Group()
 gunner_spawn = pygame.USEREVENT + 1
 pygame.time.set_timer(gunner_spawn, 1000)
 
+player_shoot = pygame.USEREVENT + 2
+pygame.time.set_timer(player_shoot, 800)
+
 # Create UI element surfaces
 player_life_surface = pygame.transform.scale_by(pygame.image.load('./assets/player_heart.png').convert_alpha(), .04)
 
@@ -283,6 +305,9 @@ while running:
         if event.type == gunner_spawn:
             enemies.add(Gunner())
 
+        if event.type == player_shoot:
+            player.sprite.energy_gun()
+
     screen.fill(background_color)
 
     for i in range(player.sprite.max_health):
@@ -297,8 +322,10 @@ while running:
 
     pygame.draw.rect(screen, 'black', (500, 5, (player.sprite.max_shadow_cooldown-player.sprite.current_shadow_cooldown)*200, 30))
 
-    detect_collision(enemies, False)
-    detect_collision(projectiles, True)
+    detect_collision(player.sprite, enemies, False)
+    detect_collision(player.sprite, projectiles, True)
+    for enemy in enemies:
+        detect_collision(enemy, player_projectiles, True)
 
     player.update()
     player.draw(screen)
@@ -308,6 +335,12 @@ while running:
 
     projectiles.update()
     projectiles.draw(screen)
+
+    player_projectiles.update()
+    player_projectiles.draw(screen)
+
+    score_surface = main_font.render('Score:  '+ str(player.sprite.score), False, 'white')
+    score_rect = score_surface.get_rect(topright=(WIDTH, 0))
 
     pygame.display.update()
     player.sprite.invulnerable_time -= 1 / FPS
