@@ -1,28 +1,22 @@
 import pygame
 import random
-from math import dist
+from math import dist, ceil
 
 # Create Player class as a sprite
 class Player(pygame.sprite.Sprite):
     def __init__(self):
         super().__init__()
-        walk_right1 = pygame.transform.scale_by(pygame.image.load('./assets/player.png').convert_alpha(), .15)
-        walk_right2 = None
-        walk_left1 = None
-        walk_left2 = None
-        self.player_images = [walk_right1, walk_right2, walk_left1, walk_left2]
-        self.animation_index = 0
-
-        self.image = self.player_images[self.animation_index]
+        self.image = pygame.transform.scale_by(pygame.image.load('./assets/player.png').convert_alpha(), .15)
         self.rect = self.image.get_rect(topleft = (300, 300))
-        self.max_health = 10
+        self.max_health = 5
         self.health = self.max_health
         self.score = 0
+        self.gold = 0
         self.speed = 6
         self.damage = 1
         self.max_shadow_cooldown = 1
-        self.current_shadow_cooldown = 1
-        self.in_shadow = False
+        self.current_shadow_cooldown = self.max_shadow_cooldown
+        self.in_shade = False
         self.max_invulnerable_time = 4
         self.invulnerable_time = 0
 
@@ -53,14 +47,11 @@ class Player(pygame.sprite.Sprite):
             self.invulnerable_time = self.max_invulnerable_time
             pygame.mixer.Sound('./assets/hit.wav').play()
 
-    def animation_state(self):
-        pass
-
     def check_death(self):
         if self.health <= 0:
             # add death animation
-            global running
-            running = False
+            global game_state
+            game_state = 'game-over'
 
     def check_bounds(self):
         if self.rect.x < 0:
@@ -74,7 +65,7 @@ class Player(pygame.sprite.Sprite):
 
     def space_pressed(self):
         if self.current_shadow_cooldown <= 0:
-            if self.in_shadow:
+            if self.in_shade:
                 self.exit_shade()
             else:
                 self.enter_shade()
@@ -83,20 +74,18 @@ class Player(pygame.sprite.Sprite):
         self.current_shadow_cooldown = self.max_shadow_cooldown
 
     def enter_shade(self):
-        self.in_shadow = True
+        global bg_color, player_life_surface
+        self.in_shade = True
         pygame.mixer.Sound('./assets/warp.wav').play()
-        global background_color
-        background_color = '#E3E3EA'
-        global player_life_surface
+        bg_color = '#E3E3EA'
         player_life_surface = pygame.transform.scale_by(pygame.image.load('./assets/shadow_heart.png').convert_alpha(), .046)
         self.speed *= .7
         pygame.mixer.Sound('./assets/warp.wav').play()
 
     def exit_shade(self):
-        self.in_shadow = False
-        global background_color
-        background_color = '#2B2B2F'
-        global player_life_surface
+        global bg_color, player_life_surface
+        self.in_shade = False
+        bg_color = '#2B2B2F'
         player_life_surface = pygame.transform.scale_by(pygame.image.load('./assets/player_heart.png').convert_alpha(), .04)
         self.speed /= .7
         pygame.mixer.Sound('./assets/warp.wav').play()
@@ -113,17 +102,31 @@ class Player(pygame.sprite.Sprite):
                     closest_enemy = enemy[0], enemy_dist
             x_change, y_change = find_vel(self.rect, enemies.sprites()[closest_enemy[0]].rect)
             player_projectiles.add(Projectile('musket', self.rect.x, self.rect.y, x_change, y_change))
-            pygame.mixer.Sound('./assets/musket-fire.wav').play()
+            pygame.mixer.Sound('./assets/pew.wav').play()
 
-    def get_kill(self, enemy_type):
-        if enemy_type == 'Gunner':
-            self.score += 5
-        else:
-            self.score += 10
+    def get_kill(self, enemy):
+        self.score += enemy.value
+
+    def reset_defaults(self):
+        global round
+        round = 1
+        self.rect = self.image.get_rect(topleft = (300, 300))
+        self.max_health = 5
+        self.health = self.max_health
+        self.score = 0
+        self.gold = 0
+        self.speed = 6
+        self.damage = 1
+        self.max_shadow_cooldown = 1
+        self.current_shadow_cooldown = self.max_shadow_cooldown
+        self.in_shade = False
+        self.max_invulnerable_time = 4
+        self.invulnerable_time = 0
+        if self.in_shade:
+            self.exit_shade()
 
     def update(self):
         self.player_inputs()
-        self.animation_state()
         self.check_death()
         self.check_bounds()
 
@@ -146,7 +149,7 @@ class Enemy:
     def take_damage(self):
         self.health -= 50
         if self.health <= 0:
-            player.sprite.get_kill('Gunner')
+            player.sprite.get_kill(self)
             self.kill()
 
     def update(self):
@@ -154,14 +157,17 @@ class Enemy:
 
 
 class Gunner(Enemy, pygame.sprite.Sprite):
+    value = 20
+
     def __init__(self):
         super().__init__()
         self.image = pygame.transform.scale_by(pygame.image.load('./assets/enemy-bird.gif').convert_alpha(), .5)
         self.rect = self.image.get_rect(topleft = (random.randint(0, WIDTH), random.randint(0, HEIGHT)))
         self.health = 100
         self.speed = 3
-        self.max_shoot_timer = 5
-        self.shoot_timer = self.max_shoot_timer
+        self.max_shoot_timer = 1.5
+        self.shoot_timer = .5
+
 
     def check_shoot(self):
         if self.shoot_timer <= 0:
@@ -176,16 +182,34 @@ class Gunner(Enemy, pygame.sprite.Sprite):
 
 
 class Bomber(Enemy, pygame.sprite.Sprite):
+    value = 25
+
     def __init__(self):
         super().__init__()
-        self.image = pygame.image.load('./assets/enemy-bomb.gif').convert_alpha()
-        self.rect = self.image.get_rect()
+        self.image = pygame.transform.scale_by(pygame.image.load('./assets/enemy-bomb.gif'), .4).convert_alpha()
+        self.rect = self.image.get_rect(topleft = (random.randint(0, WIDTH), random.randint(0, HEIGHT)))
         self.health = 200
         self.speed = 3
 
-    def explode(self):
-        pass
+    def check_explode(self):
+        if dist((self.rect.x, self.rect.y), (player.sprite.rect.x, player.sprite.rect.y)) < 50:
+            self.kill()
+            player.sprite.take_damage()
 
+    def update(self):
+        super().update()
+        self.check_explode()
+
+
+class Prism(Enemy, pygame.sprite.Sprite):
+    value = 50
+
+    def __init__(self):
+        super().__init__()
+        self.image = pygame.image.load('./assets/enemy-prism.gif').convert_alpha()
+        self.rect = self.image.get_rect(topleft = (random.randint(0, WIDTH), random.randint(0, HEIGHT)))
+        self.health = 500
+        self.speed = 1
 
 # Create Projectile class as a sprite
 class Projectile(pygame.sprite.Sprite):
@@ -212,21 +236,6 @@ class Projectile(pygame.sprite.Sprite):
         self.move()
 
 
-# Create Timer class
-class Timer:
-    def __init__(self, interval, action):
-        self.interval = interval
-        self.action = action
-        self.start_time = pygame.time.get_ticks()
-
-    def update(self):
-        current_time = pygame.time.get_ticks()
-        elapsed_time = current_time - self.start_time
-        if elapsed_time >= self.interval:
-            self.action()
-            self.start_time = current_time  # Reset timer
-
-
 # Create collison functions
 def detect_collision(target_group, object_group, do_destroy_object):
     collision_list = pygame.sprite.spritecollide(target_group, object_group, do_destroy_object)
@@ -247,7 +256,45 @@ def find_vel(point1, point2):
     return x_change, y_change
 
 
-# Initialize pygame, screen, clock
+def draw_sprites(sprite_groups):
+    for group in sprite_groups:
+        group.update()
+        group.draw(screen)
+
+
+def find_round_enemies():
+    round_value = round ** 1.2 + 40
+    enemy_spawn_list = []
+    enemy_spawn_chance = [.6, .3, .1]
+    while round_value > 19:
+        choice = random.choices(Enemy.__subclasses__(), enemy_spawn_chance)
+        enemy_spawn_list.append(choice[0]())
+        round_value -= choice[0]().value
+    return enemy_spawn_list
+
+
+def clear_sprites():
+    enemies.empty()
+    projectiles.empty()
+    player_projectiles.empty()
+    
+
+def advance_round():
+    global max_round_time, round_timer
+    max_round_time += 1
+    round_timer = max_round_time
+    clear_sprites()
+    # add a shop
+
+
+def begin_fighting():
+    global game_state
+    clear_sprites()
+    player.sprite.reset_defaults()
+    game_state = 'fighting'
+
+    
+# Initialize pygame and global variables
 pygame.init()
 SCREEN_RES = WIDTH, HEIGHT = 1920, 1040
 FPS = 60
@@ -257,10 +304,13 @@ pygame.display.set_caption('Phantom Passage')
 clock = pygame.time.Clock()
 main_font = pygame.font.Font('./assets/Pixeltype.ttf', 50)
 round = 1
-background_color = '#2B2B2F'
-background_music = pygame.mixer.Sound('./assets/main_audio.mp3')
-background_music.set_volume(1)
-background_music.play(loops=-1)
+max_round_time = 10
+round_timer = max_round_time
+bg_color = '#2B2B2F'
+bg_music = pygame.mixer.Sound('./assets/main_audio.mp3')
+bg_music.set_volume(.5)
+bg_music.play(loops=-1)
+game_state = 'fighting'
 
 # Create the player sprite group
 player = pygame.sprite.GroupSingle()
@@ -276,19 +326,16 @@ projectiles = pygame.sprite.Group()
 player_projectiles = pygame.sprite.Group()
 
 # Create enemy spawn event timers
-gunner_spawn = pygame.USEREVENT + 1
-pygame.time.set_timer(gunner_spawn, 1000)
+enemy_spawn = pygame.USEREVENT + 1
+pygame.time.set_timer(enemy_spawn, 5000)
 
 player_shoot = pygame.USEREVENT + 2
-pygame.time.set_timer(player_shoot, 800)
+pygame.time.set_timer(player_shoot, 400)
 
 # Create UI element surfaces
 player_life_surface = pygame.transform.scale_by(pygame.image.load('./assets/player_heart.png').convert_alpha(), .04)
 
 player_max_life_surface = pygame.transform.scale_by(pygame.image.load('./assets/empty_player_heart.png').convert_alpha(), .04)
-
-score_surface = main_font.render('Score:  '+ str(player.sprite.score), False, 'white')
-score_rect = score_surface.get_rect(topright=(WIDTH, 0))
 
 
 # Main loop
@@ -298,60 +345,84 @@ while running:
         if event.type == pygame.QUIT:
             running = False
 
-        if event.type == pygame.KEYDOWN:
-            if event.key == pygame.K_SPACE:
-                player.sprite.space_pressed()
+        if game_state == 'fighting':
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_SPACE:
+                    player.sprite.space_pressed()
+            
+            if event.type == enemy_spawn:
+                for enemy in find_round_enemies():
+                    enemies.add(enemy)
+
+            if event.type == player_shoot:
+                player.sprite.energy_gun()
+
+    if game_state == 'fighting' or 'shopping':
+        screen.fill(bg_color)
+
+        for i in range(player.sprite.max_health):
+            player_max_life_rect = player_max_life_surface.get_rect(topleft=(i*50, 0))
+            screen.blit(player_max_life_surface, player_max_life_rect)
+            
+        for i in range(player.sprite.health):
+            player_life_rect = player_life_surface.get_rect(topleft=(i * 50, 0))
+            screen.blit(player_life_surface, player_life_rect)
+
+        pygame.draw.rect(screen, 'black', (500, 5, (player.sprite.max_shadow_cooldown-player.sprite.current_shadow_cooldown)*500, 30))
+
+        round_time_display = main_font.render('Time remaining: ' + str(ceil(round_timer)), False, 'white')
+        round_time_rect = round_time_display.get_rect(topleft = (1120, 0))
+        screen.blit(round_time_display, round_time_rect)
+
+        score_surface = main_font.render('Score:  ' + str(player.sprite.score), False, 'white')
+        score_rect = score_surface.get_rect(topright=(WIDTH, 0))
+        screen.blit(score_surface, score_rect)
+
+        detect_collision(player.sprite, enemies, False)
+        detect_collision(player.sprite, projectiles, True)
+        for enemy in enemies:
+            detect_collision(enemy, player_projectiles, True)
+
+        draw_sprites((player, enemies, projectiles, player_projectiles))
+
+        if game_state == 'shopping':
+            print('i am shopping')
+            fight_prompt = main_font.render('Press Enter to continue...', False, 'white')
+            screen.blit(fight_prompt, fight_prompt.get_rect(topleft = (300, 300)))
+
+            if pygame.key.get_pressed()[pygame.K_RETURN]:
+                    begin_fighting()
         
-        if event.type == gunner_spawn:
-            enemies.add(Gunner())
+        elif game_state == 'fighting':
+            round_timer -= 1 / FPS
 
-        if event.type == player_shoot:
-            player.sprite.energy_gun()
+            if round_timer <= 0:
+                game_state = 'shopping'
+                advance_round()
 
-    screen.fill(background_color)
+        player.sprite.invulnerable_time -= 1 / FPS
+        player.sprite.current_shadow_cooldown -= 1 / FPS
+        if player.sprite.current_shadow_cooldown < 0:
+            player.sprite.current_shadow_cooldown = 0
+        for sprite in enemies:
+            if hasattr(sprite, 'shoot_timer'):
+                sprite.shoot_timer -= 1 / FPS               
 
-    for i in range(player.sprite.max_health):
-        player_max_life_rect = player_max_life_surface.get_rect(topleft=(i*50, 0))
-        screen.blit(player_max_life_surface, player_max_life_rect)
-        
-    for i in range(player.sprite.health):
-        player_life_rect = player_life_surface.get_rect(topleft=(i * 50, 0))
-        screen.blit(player_life_surface, player_life_rect)
 
-    screen.blit(score_surface, score_rect)
+    elif game_state == 'game-over':
+        screen.fill(bg_color)
 
-    pygame.draw.rect(screen, 'black', (500, 5, (player.sprite.max_shadow_cooldown-player.sprite.current_shadow_cooldown)*200, 30))
+        death_text = main_font.render('You have been sent to the shadow realm...', False, 'white')
+        death_text_rect = death_text.get_rect(topleft = (300, 300))
+        screen.blit(death_text, death_text_rect)
 
-    detect_collision(player.sprite, enemies, False)
-    detect_collision(player.sprite, projectiles, True)
-    for enemy in enemies:
-        detect_collision(enemy, player_projectiles, True)
+        score_text = main_font.render(f'You scored {str(player.sprite.score)} points. Press enter to continue', False, 'white')
+        score_text_rect = score_text.get_rect(topleft = (500, 700))
+        screen.blit(score_text, score_text_rect)
 
-    player.update()
-    player.draw(screen)
+        if pygame.key.get_pressed()[pygame.K_RETURN]:
+            begin_fighting()
 
-    enemies.update()
-    enemies.draw(screen)
-
-    projectiles.update()
-    projectiles.draw(screen)
-
-    player_projectiles.update()
-    player_projectiles.draw(screen)
-
-    score_surface = main_font.render('Score:  '+ str(player.sprite.score), False, 'white')
-    score_rect = score_surface.get_rect(topright=(WIDTH, 0))
 
     pygame.display.update()
-    player.sprite.invulnerable_time -= 1 / FPS
-    player.sprite.current_shadow_cooldown -= 1 / FPS
-    if player.sprite.current_shadow_cooldown < 0:
-        player.sprite.current_shadow_cooldown = 0
-    for sprite in enemies:
-        sprite.shoot_timer -= 1 / FPS
     clock.tick(FPS)
-
-
-
-
-print('Game over! You scored ' + str(player.sprite.score))
