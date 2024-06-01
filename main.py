@@ -14,11 +14,12 @@ class Player(pygame.sprite.Sprite):
         self.gold = 0
         self.speed = 6
         self.damage = 1
-        self.max_shadow_cooldown = 1
+        self.max_shadow_cooldown = 5
         self.current_shadow_cooldown = self.max_shadow_cooldown
         self.in_shade = False
         self.max_invulnerable_time = 4
         self.invulnerable_time = 0
+        self.damage_modifier = 1
 
     def player_inputs(self):
         keys = pygame.key.get_pressed()
@@ -106,21 +107,21 @@ class Player(pygame.sprite.Sprite):
 
     def get_kill(self, enemy):
         self.score += enemy.value
+        self.gold += enemy.value
 
     def reset_defaults(self):
         global round
         round = 1
-        self.rect = self.image.get_rect(topleft = (300, 300))
         self.max_health = 5
         self.health = self.max_health
         self.score = 0
         self.gold = 0
         self.speed = 6
         self.damage = 1
-        self.max_shadow_cooldown = 1
+        self.max_shadow_cooldown = 5
         self.current_shadow_cooldown = self.max_shadow_cooldown
         self.in_shade = False
-        self.max_invulnerable_time = 4
+        self.max_invulnerable_time = 3
         self.invulnerable_time = 0
         if self.in_shade:
             self.exit_shade()
@@ -147,7 +148,7 @@ class Enemy:
             self.rect.y += y_change * self.speed
 
     def take_damage(self):
-        self.health -= 50
+        self.health -= 50 * player.sprite.damage_modifier
         if self.health <= 0:
             player.sprite.get_kill(self)
             self.kill()
@@ -263,7 +264,7 @@ def draw_sprites(sprite_groups):
 
 
 def find_round_enemies():
-    round_value = round ** 1.2 + 40
+    round_value = (round+5) ** 1.5 + 40
     enemy_spawn_list = []
     enemy_spawn_chance = [.6, .3, .1]
     while round_value > 19:
@@ -280,7 +281,8 @@ def clear_sprites():
     
 
 def advance_round():
-    global max_round_time, round_timer
+    global round, max_round_time, round_timer
+    round += 1
     max_round_time += 1
     round_timer = max_round_time
     clear_sprites()
@@ -288,12 +290,43 @@ def advance_round():
 
 
 def begin_fighting():
-    global game_state
+    global game_state, round, max_round_time, round_timer
     clear_sprites()
     player.sprite.reset_defaults()
     game_state = 'fighting'
+    round = 1
+    max_round_time = 10
+    round_timer = max_round_time
 
+
+def draw_ui():
+    for i in range(player.sprite.max_health):
+        player_max_life_rect = player_max_life_surface.get_rect(topleft=(i*50, 0))
+        screen.blit(player_max_life_surface, player_max_life_rect)
+        
+    for i in range(player.sprite.health):
+        player_life_rect = player_life_surface.get_rect(topleft=(i * 50, 0))
+        screen.blit(player_life_surface, player_life_rect)
+
+    pygame.draw.rect(screen, 'black', (500, 5, (player.sprite.max_shadow_cooldown-player.sprite.current_shadow_cooldown)*100, 30))
+
+    round_time_surface = main_font.render('Time remaining: ' + str(ceil(round_timer)), False, 'white')
+    round_time_rect = round_time_surface.get_rect(topleft = (1120, 0))
+    screen.blit(round_time_surface, round_time_rect)
+
+    gold_surface = pygame.transform.scale_by(pygame.image.load('./assets/gold_coin.gif').convert_alpha(), 1.5)
+    gold_rect = gold_surface.get_rect(topleft = (1500, 0))
+    screen.blit(gold_surface, gold_rect)
+
+    gold_number = main_font.render(str(player.sprite.gold), False, 'white')
+    gold_number_rect = gold_number.get_rect(topleft = (1530, 0))
+    screen.blit(gold_number, gold_number_rect)
+
+    score_surface = main_font.render('Score:  ' + str(player.sprite.score), False, 'white')
+    score_rect = score_surface.get_rect(topright=(WIDTH, 0))
+    screen.blit(score_surface, score_rect)
     
+
 # Initialize pygame and global variables
 pygame.init()
 SCREEN_RES = WIDTH, HEIGHT = 1920, 1040
@@ -311,6 +344,7 @@ bg_music = pygame.mixer.Sound('./assets/main_audio.mp3')
 bg_music.set_volume(.5)
 bg_music.play(loops=-1)
 game_state = 'fighting'
+upgrades = ('Damage +30%', 'Speed +50%', 'Max Health +1', 'Shadow Cooldown -1 sec')
 
 # Create the player sprite group
 player = pygame.sprite.GroupSingle()
@@ -327,7 +361,7 @@ player_projectiles = pygame.sprite.Group()
 
 # Create enemy spawn event timers
 enemy_spawn = pygame.USEREVENT + 1
-pygame.time.set_timer(enemy_spawn, 5000)
+pygame.time.set_timer(enemy_spawn, 3000)
 
 player_shoot = pygame.USEREVENT + 2
 pygame.time.set_timer(player_shoot, 400)
@@ -340,7 +374,6 @@ player_max_life_surface = pygame.transform.scale_by(pygame.image.load('./assets/
 
 # Main loop
 while running:
-
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
@@ -357,26 +390,10 @@ while running:
             if event.type == player_shoot:
                 player.sprite.energy_gun()
 
-    if game_state == 'fighting' or 'shopping':
+    if game_state == 'fighting' or game_state == 'shopping':
         screen.fill(bg_color)
 
-        for i in range(player.sprite.max_health):
-            player_max_life_rect = player_max_life_surface.get_rect(topleft=(i*50, 0))
-            screen.blit(player_max_life_surface, player_max_life_rect)
-            
-        for i in range(player.sprite.health):
-            player_life_rect = player_life_surface.get_rect(topleft=(i * 50, 0))
-            screen.blit(player_life_surface, player_life_rect)
-
-        pygame.draw.rect(screen, 'black', (500, 5, (player.sprite.max_shadow_cooldown-player.sprite.current_shadow_cooldown)*500, 30))
-
-        round_time_display = main_font.render('Time remaining: ' + str(ceil(round_timer)), False, 'white')
-        round_time_rect = round_time_display.get_rect(topleft = (1120, 0))
-        screen.blit(round_time_display, round_time_rect)
-
-        score_surface = main_font.render('Score:  ' + str(player.sprite.score), False, 'white')
-        score_rect = score_surface.get_rect(topright=(WIDTH, 0))
-        screen.blit(score_surface, score_rect)
+        draw_ui()
 
         detect_collision(player.sprite, enemies, False)
         detect_collision(player.sprite, projectiles, True)
@@ -386,12 +403,17 @@ while running:
         draw_sprites((player, enemies, projectiles, player_projectiles))
 
         if game_state == 'shopping':
-            print('i am shopping')
             fight_prompt = main_font.render('Press Enter to continue...', False, 'white')
-            screen.blit(fight_prompt, fight_prompt.get_rect(topleft = (300, 300)))
+            screen.blit(fight_prompt, fight_prompt.get_rect(topleft = (300, 200)))
+
+            # select the correct upgrades from upgrades list
+            # display on screen and detect for player click
+            # make the proper upgrade and remove the correct number of coins
+            # if the list is empty, refill it with more upgrades
+            # add a manual reroll function
 
             if pygame.key.get_pressed()[pygame.K_RETURN]:
-                    begin_fighting()
+                    game_state = 'fighting'
         
         elif game_state == 'fighting':
             round_timer -= 1 / FPS
