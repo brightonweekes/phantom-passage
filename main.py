@@ -109,6 +109,11 @@ class Player(pygame.sprite.Sprite):
         self.score += enemy.value
         self.gold += enemy.value
 
+    def upgrade(self, stat, amount, cost):
+        if self.gold >= cost:
+            self.gold -= cost
+            setattr(self, stat, getattr(self, stat) + amount)
+
     def reset_defaults(self):
         global round
         round = 1
@@ -344,7 +349,13 @@ bg_music = pygame.mixer.Sound('./assets/main_audio.mp3')
 bg_music.set_volume(.5)
 bg_music.play(loops=-1)
 game_state = 'fighting'
-upgrades = ('Damage +30%', 'Speed +50%', 'Max Health +1', 'Shadow Cooldown -1 sec')
+upgrades = [
+    {"name": "Increase Health", "stat": "max_health", "amount": 1, "cost": 50},
+    {"name": "Increase Attack", "stat": "damage_modifier", "amount": .5, "cost": 50},
+    {"name": "Increase Speed", "stat": "speed", "amount": 3, "cost": 50},
+    {"name": "Decrease Shadow Cooldown", "stat": "max_shadow_cooldown", "amount": -1, "cost": 60},
+]
+available_upgrades = []
 
 # Create the player sprite group
 player = pygame.sprite.GroupSingle()
@@ -406,9 +417,20 @@ while running:
             fight_prompt = main_font.render('Press Enter to continue...', False, 'white')
             screen.blit(fight_prompt, fight_prompt.get_rect(topleft = (300, 200)))
 
-            # select the correct upgrades from upgrades list
-            # display on screen and detect for player click
-            # make the proper upgrade and remove the correct number of coins
+            mouse_pos = pygame.mouse.get_pos()
+            mouse_click = pygame.mouse.get_pressed()
+
+            y = 400
+            for upgrade in available_upgrades:
+                upgrade_label = main_font.render(f"{upgrade['name']} (+{upgrade['amount']}) - Cost: {upgrade['cost']} Gold", False, 'white')
+                upgrade_label_rect = upgrade_label.get_rect(topleft=(200, y))
+                screen.blit(upgrade_label, upgrade_label_rect)
+                y += 100
+                
+                if upgrade_label_rect.collidepoint(mouse_pos) and mouse_click[0]:
+                    player.sprite.upgrade(upgrade['stat'], upgrade['amount'], upgrade['cost'])
+                    available_upgrades.remove(upgrade)
+
             # if the list is empty, refill it with more upgrades
             # add a manual reroll function
 
@@ -420,6 +442,7 @@ while running:
 
             if round_timer <= 0:
                 game_state = 'shopping'
+                available_upgrades = random.sample(upgrades, 3)
                 advance_round()
 
         player.sprite.invulnerable_time -= 1 / FPS
