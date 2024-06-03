@@ -390,13 +390,13 @@ bg_music.set_volume(.5)
 bg_music.play(loops=-1)
 game_state = 'fighting'
 upgrades = [
-    {"name": "Increase Health", "stat": "max_health", "factor": 1, "cost": 50},
-    {"name": "Increase Attack", "stat": "damage_modifier", "factor": 1.5, "cost": 60},
-    {"name": "Increase Speed", "stat": "speed", "factor": 1.3, "cost": 80},
-    {"name": "Decrease Shadow Cooldown", "stat": "max_shadow_cooldown", "factor": .7, "cost": 50},
-    {"name": "Increase Firerate", "stat": "max_fire_cooldown", "factor": .8, "cost": 80},
-    {"name": "Increase Shadow Duration", "stat": "max_shadow_duration", "factor": 1.5, "cost": 40},
-    {"name": "Increase Projectile Speed", "stat": "projectile_speed", "factor": 1.5, "cost": 60},
+    {"name": "Increase Health", "stat": "max_health", "factor": 1, "cost": 100},
+    {"name": "Increase Attack", "stat": "damage_modifier", "factor": 1.5, "cost": 120},
+    {"name": "Increase Speed", "stat": "speed", "factor": 1.3, "cost": 160},
+    {"name": "Decrease Shadow Cooldown", "stat": "max_shadow_cooldown", "factor": .7, "cost": 100},
+    {"name": "Increase Firerate", "stat": "max_fire_cooldown", "factor": .8, "cost": 160},
+    {"name": "Increase Shadow Duration", "stat": "max_shadow_duration", "factor": 1.5, "cost": 80},
+    {"name": "Increase Projectile Speed", "stat": "projectile_speed", "factor": 1.5, "cost": 120},
 ]
 available_upgrades = []
 reroll_num = 0
