@@ -300,7 +300,7 @@ def draw_sprites(sprite_groups):
 
 
 def find_round_enemies():
-    round_value = (round+5) ** 2 + 40
+    round_value = (round+5) ** 2.5
     enemy_spawn_list = []
     enemy_spawn_chance = [.6, .3, .1]
     while round_value > 19:
@@ -331,7 +331,7 @@ def begin_fighting():
     player.sprite.reset_defaults()
     game_state = 'fighting'
     round = 1
-    max_round_time = 10
+    max_round_time = 20
     round_timer = max_round_time
 
 
