@@ -93,7 +93,7 @@ class Player(pygame.sprite.Sprite):
         self.in_shade = True
         self.shadow_duration = self.max_shadow_duration
         pygame.mixer.Sound('./assets/warp.wav').play()
-        bg_color = '#E3E3EA'
+        bg_color = '#BABDC3'
         player_life_surface = pygame.transform.scale_by(pygame.image.load('./assets/shadow_heart.png').convert_alpha(), .046)
         self.speed *= .7
         pygame.mixer.Sound('./assets/warp.wav').play()
@@ -189,8 +189,6 @@ class Enemy:
         self.health -= 50 * player.sprite.damage_modifier
         if self.health <= 0:
             player.sprite.get_kill(self)
-            # enemy_ghosts.add(self.copy())
-            # perhaps you dont need the copy and can just remove self from enemies list
             self.kill()
 
     def update(self):
@@ -321,7 +319,7 @@ def clear_sprites():
 def advance_round():
     global round, max_round_time, round_timer
     round += 1
-    max_round_time += 1
+    max_round_time += 2
     round_timer = max_round_time
     clear_sprites()
     # add a shop
@@ -384,7 +382,7 @@ pygame.display.set_caption('Phantom Passage')
 clock = pygame.time.Clock()
 main_font = pygame.font.Font('./assets/Pixeltype.ttf', 50)
 round = 1
-max_round_time = 10
+max_round_time = 20
 round_timer = max_round_time
 bg_color = '#2B2B2F'
 bg_music = pygame.mixer.Sound('./assets/main_audio.mp3')
@@ -393,11 +391,11 @@ bg_music.play(loops=-1)
 game_state = 'fighting'
 upgrades = [
     {"name": "Increase Health", "stat": "max_health", "factor": 1, "cost": 50},
-    {"name": "Increase Attack", "stat": "damage_modifier", "factor": 1.5, "cost": 50},
-    {"name": "Increase Speed", "stat": "speed", "factor": 1.3, "cost": 50},
-    {"name": "Decrease Shadow Cooldown", "stat": "max_shadow_cooldown", "factor": .7, "cost": 60},
-    {"name": "Increase Firerate", "stat": "max_fire_cooldown", "factor": .8, "cost": 60},
-    {"name": "Increase Shadow Duration", "stat": "max_shadow_duration", "factor": 1.5, "cost": 60},
+    {"name": "Increase Attack", "stat": "damage_modifier", "factor": 1.5, "cost": 60},
+    {"name": "Increase Speed", "stat": "speed", "factor": 1.3, "cost": 80},
+    {"name": "Decrease Shadow Cooldown", "stat": "max_shadow_cooldown", "factor": .7, "cost": 50},
+    {"name": "Increase Firerate", "stat": "max_fire_cooldown", "factor": .8, "cost": 80},
+    {"name": "Increase Shadow Duration", "stat": "max_shadow_duration", "factor": 1.5, "cost": 40},
     {"name": "Increase Projectile Speed", "stat": "projectile_speed", "factor": 1.5, "cost": 60},
 ]
 available_upgrades = []
@@ -416,9 +414,6 @@ projectiles = pygame.sprite.Group()
 
 # Create the player projectiles sprite group
 player_projectiles = pygame.sprite.Group()
-
-# Create enemy ghost sprite group
-enemy_ghosts = pygame.sprite.Group()
 
 # Create enemy spawn event timers
 enemy_spawn = pygame.USEREVENT + 1
@@ -482,7 +477,7 @@ while running:
                     if upgrade_label_rect.collidepoint(mouse_pos) and mouse_click[0] and player.sprite.gold >= upgrade['cost']:
                         player.sprite.upgrade(upgrade['stat'], upgrade['factor'], upgrade['cost'])
                         available_upgrades[available_upgrades.index(upgrade)] = None
-                        pygame.time.delay(100)
+                        pygame.time.delay(200)
 
                 y += 100
             
