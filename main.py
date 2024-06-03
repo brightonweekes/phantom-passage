@@ -483,7 +483,7 @@ while running:
             
             reroll_cost = (reroll_num + 1) * 10
                 
-            reroll_label = main_font.render(f'Reroll       {reroll_cost}', False, 'white', 'black')
+            reroll_label = main_font.render(f'Reroll       {reroll_cost}', False, 'white')
             reroll_label_rect = reroll_label.get_rect(topleft = (800, 650))
             screen.blit(reroll_label, reroll_label_rect)
 
