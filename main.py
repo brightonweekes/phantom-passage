@@ -8,7 +8,7 @@ class Player(pygame.sprite.Sprite):
         super().__init__()
         self.image = pygame.transform.scale_by(pygame.image.load('./assets/player.png').convert_alpha(), .15)
         self.rect = self.image.get_rect(topleft = (300, 300))
-        self.max_health = 5000
+        self.max_health = 5
         self.health = self.max_health
         self.score = 0
         self.gold = 0
