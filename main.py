@@ -8,23 +8,27 @@ class Player(pygame.sprite.Sprite):
         super().__init__()
         self.image = pygame.transform.scale_by(pygame.image.load('./assets/player.png').convert_alpha(), .15)
         self.rect = self.image.get_rect(topleft = (300, 300))
-        self.max_health = 5
+        self.max_health = 5000
         self.health = self.max_health
         self.score = 0
         self.gold = 0
         self.speed = 6
         self.damage = 1
-        self.max_shadow_cooldown = 5
+        self.max_shadow_cooldown = 15
         self.current_shadow_cooldown = self.max_shadow_cooldown
         self.in_shade = False
-        self.max_shadow_duration = 5
+        self.max_shadow_duration = 8
         self.shadow_duration = self.max_shadow_duration
         self.max_invulnerable_time = 3
         self.invulnerable_time = 0
         self.damage_modifier = 1
-        self.max_fire_cooldown = .4
-        self.fire_cooldown = self.max_fire_cooldown
-        self.projectile_speed = 1
+        self.firerate_modifier = 1
+        self.range_modifier = 1
+        self.max_energy_gun_cooldown = .4
+        self.energy_gun_cooldown = self.max_energy_gun_cooldown
+        self.max_shotgun_cooldown = 1
+        self.shotgun_cooldown = self.max_shotgun_cooldown
+        self.projectile_speed = 8
 
     def player_inputs(self):
         keys = pygame.key.get_pressed()
@@ -59,8 +63,13 @@ class Player(pygame.sprite.Sprite):
             global game_state
             game_state = 'game-over'
 
-    def update_shade_timers(self):
+    def update_timers(self):
         if game_state == 'fighting':
+            self.invulnerable_time -= 1 / FPS
+            self.energy_gun_cooldown -= 1 / FPS
+            self.shotgun_cooldown -= 1 / FPS
+            if self.current_shadow_cooldown < 0:
+                self.current_shadow_cooldown = 0
             if self.in_shade:
                 self.shadow_duration -= 1 / FPS
                 if self.shadow_duration <= 0:
@@ -110,16 +119,29 @@ class Player(pygame.sprite.Sprite):
         self.health -= 1   
 
     def energy_gun(self):
-        if enemies and self.fire_cooldown <= 0:
-            self.fire_cooldown = self.max_fire_cooldown
-            closest_enemy = 0, dist((self.rect.x, self.rect.y), (enemies.sprites()[0].rect.x, enemies.sprites()[0].rect.y))
-            for enemy in enumerate(enemies.sprites()):
-                enemy_dist = dist((self.rect.x, self.rect.y), (enemy[1].rect.x, enemy[1].rect.y))
-                if enemy_dist < closest_enemy[1]:
-                    closest_enemy = enemy[0], enemy_dist
-            x_change, y_change = find_vel(self.rect, enemies.sprites()[closest_enemy[0]].rect)
-            player_projectiles.add(Projectile('musket', self.rect.x, self.rect.y, x_change, y_change, self.projectile_speed))
+        if enemies and self.energy_gun_cooldown <= 0:
+            self.energy_gun_cooldown = self.max_energy_gun_cooldown * self.firerate_modifier
+            x_change, y_change = self.find_closest_enemy_distance()
+            player_projectiles.add(Projectile(self.rect.x, self.rect.y, x_change, y_change, self.projectile_speed, pygame.transform.scale_by(pygame.image.load('./assets/bullet-snowball.png').convert_alpha(), .2), 1400 * self.range_modifier))
             pygame.mixer.Sound('./assets/pew.wav').play()
+
+    def shotgun(self):
+        if enemies and self.shotgun_cooldown <= 0:
+            self.shotgun_cooldown = self.max_shotgun_cooldown * self.firerate_modifier
+            x_change, y_change = self.find_closest_enemy_distance()
+            for i in range(6):
+                player_projectiles.add(Projectile(self.rect.x, self.rect.y, x_change+random.uniform(-.5, .5), y_change+random.uniform(-.5, .5), self.projectile_speed, pygame.image.load('./assets/Musket_Ball.webp').convert_alpha(), 600 * self.range_modifier))
+            pygame.mixer.Sound('./assets/musket.wav').play()
+
+    def find_closest_enemy_distance(self):
+        closest_enemy = 0, dist((self.rect.x, self.rect.y), (enemies.sprites()[0].rect.x, enemies.sprites()[0].rect.y))
+        for enemy in enumerate(enemies.sprites()):
+            enemy_dist = dist((self.rect.x, self.rect.y), (enemy[1].rect.x, enemy[1].rect.y))
+            if enemy_dist < closest_enemy[1]:
+                closest_enemy = enemy[0], enemy_dist
+        x_change, y_change = find_vel(self.rect, enemies.sprites()[closest_enemy[0]].rect)
+        return x_change, y_change
+
 
     def get_kill(self, enemy):
         self.score += enemy.value
@@ -129,6 +151,7 @@ class Player(pygame.sprite.Sprite):
         self.gold -= cost
         setattr(self, stat, getattr(self, stat) * factor)
         if stat == 'max_health':
+            self.max_health += 1
             self.health += 1
 
     def reset_defaults(self):
@@ -140,25 +163,29 @@ class Player(pygame.sprite.Sprite):
         self.gold = 0
         self.speed = 6
         self.damage = 1
-        self.max_shadow_cooldown = 5
+        self.max_shadow_cooldown = 15
         self.current_shadow_cooldown = self.max_shadow_cooldown
         if self.in_shade:
             self.exit_shade()
-        self.max_shadow_duration = 5
+        self.max_shadow_duration = 8
         self.shadow_duration = self.max_shadow_duration
         self.max_invulnerable_time = 3
         self.invulnerable_time = 0
         self.damage_modifier = 1
-        self.max_fire_cooldown = .4
-        self.fire_cooldown = self.max_fire_cooldown
-        self.projectile_speed = 1
+        self.firerate_modifier = 1
+        self.max_energy_gun_cooldown = .4
+        self.energy_gun_cooldown = self.max_energy_gun_cooldown
+        self.max_shotgun_cooldown = 1
+        self.shotgun_cooldown = self.max_shotgun_cooldown
+        self.projectile_speed = 8
 
     def update(self):
         self.player_inputs()
         self.check_death()
         self.check_bounds()
         self.energy_gun()
-        self.update_shade_timers()
+        self.shotgun()
+        self.update_timers()
 
 
 # Create Enemy class and subclasses as sprites
@@ -211,7 +238,7 @@ class Gunner(Enemy, pygame.sprite.Sprite):
         if self.shoot_timer <= 0:
             self.shoot_timer = self.max_shoot_timer
             x_change, y_change = find_vel(self.rect, player.sprite.rect)
-            projectiles.add(Projectile('energy', self.rect.x, self.rect.y, x_change, y_change, 1))
+            projectiles.add(Projectile(self.rect.x, self.rect.y, x_change, y_change, 4, pygame.transform.scale_by(pygame.image.load('./assets/bullet-energy.png').convert_alpha(), .2), 2000))
             pygame.mixer.Sound('./assets/pew.wav').play()
 
     def update(self):
@@ -251,24 +278,21 @@ class Prism(Enemy, pygame.sprite.Sprite):
 
 # Create Projectile class as a sprite
 class Projectile(pygame.sprite.Sprite):
-    def __init__(self, type, x, y, x_change, y_change, vel_modifier):
+    def __init__(self, x, y, x_change, y_change, speed, image, range):
         super().__init__()
         self.x_change = x_change
         self.y_change = y_change
-
-        if type == 'energy':
-            image = pygame.transform.scale_by(pygame.image.load('./assets/bullet-energy.png').convert_alpha(), .2)
-            self.speed = 4 * vel_modifier
-        elif type == 'musket':
-            image = pygame.transform.scale_by(pygame.image.load('./assets/bullet-snowball.png').convert_alpha(), .2)
-            self.speed = 8 * vel_modifier
-
+        self.speed = speed
         self.image = image
         self.rect = self.image.get_rect(topleft = (x, y))
+        self.range = range
 
     def move(self):
+        self.range -= (abs(self.x_change) + abs(self.y_change)) * self.speed
         self.rect.x += self.x_change * self.speed
         self.rect.y += self.y_change * self.speed
+        if self.range <= 0:
+            self.kill()
 
     def update(self):
         self.move()
@@ -300,7 +324,7 @@ def draw_sprites(sprite_groups):
 
 
 def find_round_enemies():
-    round_value = (round+5) ** 2.5
+    round_value = round ** 3 + 80
     enemy_spawn_list = []
     enemy_spawn_chance = [.6, .3, .1]
     while round_value > 19:
@@ -321,8 +345,9 @@ def advance_round():
     round += 1
     max_round_time += 2
     round_timer = max_round_time
+    if player.sprite.health < player.sprite.max_health:
+        player.sprite.health += 1
     clear_sprites()
-    # add a shop
 
 
 def begin_fighting():
@@ -390,11 +415,11 @@ bg_music.set_volume(.5)
 bg_music.play(loops=-1)
 game_state = 'fighting'
 upgrades = [
-    {"name": "Increase Health", "stat": "max_health", "factor": 1, "cost": 100},
+    {"name": "Increase Max Health", "stat": "max_health", "factor": 1, "cost": 130},
     {"name": "Increase Attack", "stat": "damage_modifier", "factor": 1.5, "cost": 120},
     {"name": "Increase Speed", "stat": "speed", "factor": 1.3, "cost": 160},
     {"name": "Decrease Shadow Cooldown", "stat": "max_shadow_cooldown", "factor": .7, "cost": 100},
-    {"name": "Increase Firerate", "stat": "max_fire_cooldown", "factor": .8, "cost": 160},
+    {"name": "Increase Firerate", "stat": "firerate_modifier", "factor": .8, "cost": 180},
     {"name": "Increase Shadow Duration", "stat": "max_shadow_duration", "factor": 1.5, "cost": 80},
     {"name": "Increase Projectile Speed", "stat": "projectile_speed", "factor": 1.5, "cost": 120},
 ]
@@ -513,10 +538,6 @@ while running:
                 advance_round()
                 reroll_num = 0
 
-            player.sprite.invulnerable_time -= 1 / FPS
-            player.sprite.fire_cooldown -= 1 / FPS
-            if player.sprite.current_shadow_cooldown < 0:
-                player.sprite.current_shadow_cooldown = 0
             for sprite in enemies:
                 if hasattr(sprite, 'shoot_timer'):
                     sprite.shoot_timer -= 1 / FPS
