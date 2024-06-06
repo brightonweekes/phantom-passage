@@ -24,9 +24,9 @@ class Player(pygame.sprite.Sprite):
         self.damage_modifier = 1
         self.firerate_modifier = 1
         self.range_modifier = 1
-        self.max_energy_gun_cooldown = .4
+        self.max_energy_gun_cooldown = .8
         self.energy_gun_cooldown = self.max_energy_gun_cooldown
-        self.max_shotgun_cooldown = 1
+        self.max_shotgun_cooldown = 2
         self.shotgun_cooldown = self.max_shotgun_cooldown
         self.projectile_speed = 8
 
@@ -145,7 +145,7 @@ class Player(pygame.sprite.Sprite):
 
     def get_kill(self, enemy):
         self.score += enemy.value
-        self.gold += enemy.value
+        self.gold += enemy.value + round * 2
 
     def upgrade(self, stat, factor, cost):
         self.gold -= cost
@@ -173,9 +173,9 @@ class Player(pygame.sprite.Sprite):
         self.invulnerable_time = 0
         self.damage_modifier = 1
         self.firerate_modifier = 1
-        self.max_energy_gun_cooldown = .4
+        self.max_energy_gun_cooldown = 1.2
         self.energy_gun_cooldown = self.max_energy_gun_cooldown
-        self.max_shotgun_cooldown = 1
+        self.max_shotgun_cooldown = .8
         self.shotgun_cooldown = self.max_shotgun_cooldown
         self.projectile_speed = 8
 
