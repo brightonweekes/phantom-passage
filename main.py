@@ -506,6 +506,7 @@ while running:
 
                 y += 100
             
+            # Reroll button and auto reroll function
             reroll_cost = (reroll_num + 1) * 10
                 
             reroll_label = main_font.render(f'Reroll       {reroll_cost}', False, 'white')
@@ -525,6 +526,36 @@ while running:
                     if not upgrades_empty:
                         reroll_num += 1
                 pygame.time.delay(100)
+
+            # Autobuy button
+            autobuy_label = main_font.render(f'Autobuy', False, 'White')
+            autobuy_rect = autobuy_label.get_rect(topleft = (1100, 650))
+            screen.blit(autobuy_label, autobuy_rect)
+
+            if autobuy_rect.collidepoint(mouse_pos) and mouse_click[0]:
+                while True:
+                    lowest_cost = None
+                    
+                    # Calculate the lowest cost of the available upgrades
+                    for upgrade in available_upgrades:
+                        if upgrade is not None:
+                            if lowest_cost is None or upgrade['cost'] < lowest_cost:
+                                lowest_cost = upgrade['cost']
+                    
+                    # Check if we need to reroll
+                    if lowest_cost is None or player.sprite.gold < lowest_cost:
+                        break  # Exit the loop if no affordable upgrades are available
+
+                    # Try to buy available upgrades
+                    reroll_needed = True
+                    for upgrade in available_upgrades:
+                        if upgrade is not None and player.sprite.gold >= upgrade['cost']:
+                            player.sprite.upgrade(upgrade['stat'], upgrade['factor'], upgrade['cost'])
+                            available_upgrades[available_upgrades.index(upgrade)] = None
+                            reroll_needed = False
+
+                    if reroll_needed:
+                        available_upgrades = random.sample(upgrades, 3) 
 
             if pygame.key.get_pressed()[pygame.K_RETURN]:
                 game_state = 'fighting'
